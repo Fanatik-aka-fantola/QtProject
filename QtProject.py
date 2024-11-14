@@ -239,8 +239,6 @@ class Ui_productivity_and_advantages(QWidget):
                 producer_name = header_item.text() if header_item else ""
         self.absolute_advantage_label.setText(f"Абсолютное преимущество имеет: {producer_name}")
 
-class Lorentz_curve(QWidget):
-
 
 class ElasticityCalculator(QWidget):
     def __init__(self):
@@ -381,6 +379,9 @@ class ElasticityCalculator(QWidget):
 
         except ZeroDivisionError:
             self.result_label.setText("Ошибка: деление на ноль. Проверьте входные данные.")
+
+
+#class smotri str122(QWidget):
 
 
 if __name__ == "__main__":
