@@ -23,18 +23,15 @@ class EconomicCurves(QMainWindow):
         self.menu_bar = QMenuBar(self)
         self.setMenuBar(self.menu_bar)
 
-        self.demand_action = QAction("Кривая спроса", self)
-        self.supply_action = QAction("Кривая предложения", self)
+        self.demandSupply_action = QAction("Кривая спроса и предложения", self)
         self.info_action = QAction("КПД таблица", self)
         self.elast_action = QAction("Калькулятор эластичности", self)
 
-        self.menu_bar.addAction(self.demand_action)
-        self.menu_bar.addAction(self.supply_action)
+        self.menu_bar.addAction(self.demandSupply_action)
         self.menu_bar.addAction(self.info_action)
         self.menu_bar.addAction(self.elast_action)
 
-        self.demand_action.triggered.connect(self.show_demand_plot)
-        self.supply_action.triggered.connect(self.show_supply_plot)
+        self.demandSupply_action.triggered.connect(self.show_demandSupply_plot)
         self.info_action.triggered.connect(self.show_kpd_page)
         self.elast_action.triggered.connect(self.show_elast_page)
 
@@ -42,38 +39,21 @@ class EconomicCurves(QMainWindow):
         self.layout.addWidget(self.stacked_widget)
 
         # Страница спроса
-        self.demand_page = QWidget()
-        self.demand_layout = QVBoxLayout(self.demand_page)
-        self.demand_price_input = QLineEdit()
-        self.demand_quantity_input = QLineEdit()
-        self.demand_plot_widget = pg.PlotWidget()
-        self.demand_layout.addWidget(QLabel("Цена:"))
-        self.demand_layout.addWidget(self.demand_price_input)
-        self.demand_layout.addWidget(QLabel("Количество:"))
-        self.demand_layout.addWidget(self.demand_quantity_input)
-        self.demand_layout.addWidget(self.demand_plot_widget)
-        self.stacked_widget.addWidget(self.demand_page)
+        self.demandSupply_page = QWidget()
+        self.demandSupply_layout = QVBoxLayout(self.demandSupply_page)
+        self.demandSupply_price_input = QLineEdit()
+        self.demandSupply_quantity_input = QLineEdit()
+        self.demandSupply_plot_widget = pg.PlotWidget()
+        self.demandSupply_layout.addWidget(QLabel("Цена:"))
+        self.demandSupply_layout.addWidget(self.demandSupply_price_input)
+        self.demandSupply_layout.addWidget(QLabel("Количество:"))
+        self.demandSupply_layout.addWidget(self.demandSupply_quantity_input)
+        self.demandSupply_layout.addWidget(self.demandSupply_plot_widget)
+        self.stacked_widget.addWidget(self.demandSupply_page)
 
         # Подключение графика
-        self.demand_price_input.textChanged.connect(self.update_demand_graph)
-        self.demand_quantity_input.textChanged.connect(self.update_demand_graph)
-
-        # Страница предложения
-        self.supply_page = QWidget()
-        self.supply_layout = QVBoxLayout(self.supply_page)
-        self.supply_price_input = QLineEdit()
-        self.supply_quantity_input = QLineEdit()
-        self.supply_plot_widget = pg.PlotWidget()
-        self.supply_layout.addWidget(QLabel("Цена:"))
-        self.supply_layout.addWidget(self.supply_price_input)
-        self.supply_layout.addWidget(QLabel("Количество:"))
-        self.supply_layout.addWidget(self.supply_quantity_input)
-        self.supply_layout.addWidget(self.supply_plot_widget)
-        self.stacked_widget.addWidget(self.supply_page)
-
-        # Подключение графика
-        self.supply_price_input.textChanged.connect(self.update_supply_graph)
-        self.supply_quantity_input.textChanged.connect(self.update_supply_graph)
+        self.demandSupply_price_input.textChanged.connect(self.update_demandSupply_graph)
+        self.demandSupply_quantity_input.textChanged.connect(self.update_demandSupply_graph)
 
         # Страница кпд
         self.kpd_page = Ui_productivity_and_advantages()
@@ -101,11 +81,8 @@ class EconomicCurves(QMainWindow):
             self.setGeometry(100, 100, 1000, 800)  # Восстанавливаем начальные параметры окна
             self.setFixedSize(1000, 800)
 
-    def show_demand_plot(self):
-        self.stacked_widget.setCurrentWidget(self.demand_page)
-
-    def show_supply_plot(self):
-        self.stacked_widget.setCurrentWidget(self.supply_page)
+    def show_demandSupply_plot(self):
+        self.stacked_widget.setCurrentWidget(self.demandSupply_page)
 
     def show_kpd_page(self):
         self.stacked_widget.setCurrentWidget(self.kpd_page)
@@ -113,9 +90,9 @@ class EconomicCurves(QMainWindow):
     def show_elast_page(self):
         self.stacked_widget.setCurrentWidget(self.elast_page)
 
-    def update_demand_graph(self):
-        price_text = self.demand_price_input.text()
-        quantity_text = self.demand_quantity_input.text()
+    def update_demandSupply_graph(self):
+        price_text = self.demandSupply_price_input.text()
+        quantity_text = self.demandSupply_quantity_input.text()
 
         if price_text:
             price = float(price_text)
@@ -128,27 +105,9 @@ class EconomicCurves(QMainWindow):
             quantity = None
 
         if price is not None and quantity is not None:
-            self.demand_plot_widget.clear()
-            self.demand_plot_widget.plot([0, quantity], [price, 0])
-
-    def update_supply_graph(self):
-        price_text = self.supply_price_input.text()
-        quantity_text = self.supply_quantity_input.text()
-
-        if price_text:
-            price = float(price_text)
-        else:
-            price = None
-
-        if quantity_text:
-            quantity = float(quantity_text)
-        else:
-            quantity = None
-
-        if price is not None and quantity is not None:
-            self.supply_plot_widget.clear()
-            self.supply_plot_widget.plot([0, quantity], [0, price])
-
+            self.demandSupply_plot_widget.clear()
+            self.demandSupply_plot_widget.plot([0, quantity], [price, 0], pen='r')
+            self.demandSupply_plot_widget.plot([price, 0], [quantity, 0], pen='g')
 
 class Ui_productivity_and_advantages(QWidget):
     def __init__(self):
@@ -199,7 +158,8 @@ class Ui_productivity_and_advantages(QWidget):
                 QMessageBox.warning(self, "Ошибка", "Достигнуто максимальное количество производителей.")
 
     def remove_producer_dialog(self):
-        producer_name, ok = QInputDialog.getText(self, "Удалить производителя", "Введите название производителя для удаления:")
+        producer_name, ok = QInputDialog.getText(self, "Удалить производителя",
+                                                 "Введите название производителя для удаления:")
         if ok and producer_name:
             current_row = self.find_producer_row(producer_name)
             if current_row != -1:
@@ -278,6 +238,8 @@ class Ui_productivity_and_advantages(QWidget):
                 header_item = self.tableWidget.verticalHeaderItem(row)
                 producer_name = header_item.text() if header_item else ""
         self.absolute_advantage_label.setText(f"Абсолютное преимущество имеет: {producer_name}")
+
+class Lorentz_curve(QWidget):
 
 
 class ElasticityCalculator(QWidget):
