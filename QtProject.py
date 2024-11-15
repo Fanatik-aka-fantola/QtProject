@@ -1,12 +1,13 @@
 import sys
+import sqlite3
 import pyqtgraph as pg
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtCore
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QVBoxLayout, QWidget,
     QLineEdit, QLabel, QMenuBar, QStackedWidget, QPushButton,
     QTableWidget, QGridLayout, QInputDialog, QMessageBox, QFormLayout,
-    QGroupBox, QDoubleSpinBox)
+    QGroupBox, QDoubleSpinBox, QTableWidgetItem)
 
 
 class EconomicCurves(QMainWindow):
@@ -14,7 +15,6 @@ class EconomicCurves(QMainWindow):
         super().__init__()
         self.setWindowTitle("Экономический калькулятор")
         self.setGeometry(100, 100, 1000, 800)
-        self.setFixedSize(1000, 800)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -44,6 +44,11 @@ class EconomicCurves(QMainWindow):
         self.demandSupply_price_input = QLineEdit()
         self.demandSupply_quantity_input = QLineEdit()
         self.demandSupply_plot_widget = pg.PlotWidget()
+
+        # Добавляем метки к осям графика
+        self.demandSupply_plot_widget.setLabel('left', 'Цена')
+        self.demandSupply_plot_widget.setLabel('bottom', 'Количество')
+
         self.demandSupply_layout.addWidget(QLabel("Цена:"))
         self.demandSupply_layout.addWidget(self.demandSupply_price_input)
         self.demandSupply_layout.addWidget(QLabel("Количество:"))
@@ -67,19 +72,18 @@ class EconomicCurves(QMainWindow):
         self.stacked_widget.currentChanged.connect(self.on_tab_change)
 
     def on_tab_change(self, index):
-        # Проверяем, является ли активная страница "калькулятором эластичности"
-        if self.stacked_widget.widget(index) == self.elast_page:
-            self.setGeometry(100, 100, 600, 800)  # Меняем параметры окна для калькулятора эластичности
-            self.setFixedSize(600, 800)
+        current_widget = self.stacked_widget.widget(index)
 
-        # Проверяем, является ли активная страница "КПД таблица"
-        elif self.stacked_widget.widget(index) == self.kpd_page:
-            self.setGeometry(100, 100, 800, 600)  # Меняем параметры окна для КПД таблицы
-            self.setFixedSize(800, 600)
-
+        # Получаем размеры текущего виджета
+        if current_widget == self.elast_page:
+            new_width, new_height = 600, 800
+        elif current_widget == self.kpd_page:
+            new_width, new_height = 740, 578  # Используем размер, который вы указали в Ui_productivity_and_advantages
         else:
-            self.setGeometry(100, 100, 1000, 800)  # Восстанавливаем начальные параметры окна
-            self.setFixedSize(1000, 800)
+            new_width, new_height = 1000, 800
+
+        # Изменяем размер окна с учётом этих данных
+        self.resize(new_width, new_height)
 
     def show_demandSupply_plot(self):
         self.stacked_widget.setCurrentWidget(self.demandSupply_page)
@@ -106,14 +110,18 @@ class EconomicCurves(QMainWindow):
 
         if price is not None and quantity is not None:
             self.demandSupply_plot_widget.clear()
-            self.demandSupply_plot_widget.plot([0, quantity], [price, 0], pen='r')
-            self.demandSupply_plot_widget.plot([price, 0], [quantity, 0], pen='g')
+
+            # Кривая спроса (обычно убывающая)
+            self.demandSupply_plot_widget.plot([0, quantity], [price, 0], pen='r', name="Кривая спроса")
+
+            # Кривая предложения (обычно возрастающая)
+            self.demandSupply_plot_widget.plot([0, quantity], [0, price], pen='g', name="Кривая предложения")
+
 
 class Ui_productivity_and_advantages(QWidget):
     def __init__(self):
         super().__init__()
         self.setObjectName("productivity_and_advantages")
-        self.resize(740, 578)
         self.gridLayout = QGridLayout(self)
         self.gridLayout.setContentsMargins(0, 0, 0, 0)
 
@@ -132,28 +140,32 @@ class Ui_productivity_and_advantages(QWidget):
         self.gridLayout.addWidget(self.process_button, 4, 0, 1, 1)  # Place it below other buttons
 
         self.tableWidget = QTableWidget(self)
-        self.tableWidget.setColumnCount(4)  # Only Q, TC, t, and P columns
+        self.tableWidget.setColumnCount(6)  # Only Q, TC, t, and P columns
         self.tableWidget.setRowCount(2)
-        self.tableWidget.setHorizontalHeaderLabels(["Q", "TC", "t", "P"])
+        self.tableWidget.setHorizontalHeaderLabels(["Q", "Q2", "TC", "t", "P", "P2"])
         self.tableWidget.setVerticalHeaderLabels(["Производитель 1", "Производитель 2"])
         self.gridLayout.addWidget(self.tableWidget, 0, 0, 1, 1)
 
-        for row in range(self.tableWidget.rowCount()):
-            default_t_item = QtWidgets.QTableWidgetItem("1")  # Default value for 't'
-            self.tableWidget.setItem(row, 2, default_t_item)
+        self.producer_name = ''
+        self.relative_advantage = ''
 
-        self.absolute_advantage_label = QLabel("Абсолютное преимущество имеет: ", self)
+        for row in range(self.tableWidget.rowCount()):
+            default_t_item = QTableWidgetItem("1.00")  # Default value for 't'
+            self.tableWidget.setItem(row, 3, default_t_item)
+
+        self.absolute_advantage_label = QLabel(f"Абсолютное преимущество имеет: {self.producer_name}"
+                                               f" \nОтносительное преимщество имеет: {self.relative_advantage}", self)
         self.gridLayout.addWidget(self.absolute_advantage_label, 5, 0, 1, 1)
 
     def add_producer_dialog(self):
         producer_name, ok = QInputDialog.getText(self, "Добавить производителя", "Введите название производителя:")
         if ok and producer_name:
             current_row_count = self.tableWidget.rowCount()
-            if current_row_count < 10:  # Example limit, can be adjusted
+            if current_row_count < 100:  # Example limit, can be adjusted
                 self.tableWidget.insertRow(current_row_count)  # Add a new row
-                default_t_item = QtWidgets.QTableWidgetItem("1")  # Default t value
-                self.tableWidget.setItem(current_row_count, 2, default_t_item)
-                self.tableWidget.setVerticalHeaderItem(current_row_count, QtWidgets.QTableWidgetItem(producer_name))
+                default_t_item = QTableWidgetItem("1")  # Default t value
+                self.tableWidget.setItem(current_row_count, 3, default_t_item)
+                self.tableWidget.setVerticalHeaderItem(current_row_count, QTableWidgetItem(producer_name))
             else:
                 QMessageBox.warning(self, "Ошибка", "Достигнуто максимальное количество производителей.")
 
@@ -177,51 +189,85 @@ class Ui_productivity_and_advantages(QWidget):
     def process_data(self):
         try:
             for row in range(self.tableWidget.rowCount()):
-                # Fetch values from the table
+                # Получение Q
                 Q_item = self.tableWidget.item(row, 0)
-                Q_text = Q_item.text() if Q_item else ''
-                Q = float(Q_text) if Q_text else None
+                if Q_item and Q_item.text():
+                    Q = float(Q_item.text())
+                else:
+                    Q = None
 
-                TC_item = self.tableWidget.item(row, 1)
-                TC_text = TC_item.text() if TC_item else ''
-                TC = float(TC_text) if TC_text else None
+                # Получение Q2
+                Q2_item = self.tableWidget.item(row, 1)
+                if Q2_item and Q2_item.text():
+                    Q2 = float(Q2_item.text())
+                else:
+                    Q2 = None
 
-                t_item = self.tableWidget.item(row, 2)
-                t_text = t_item.text() if t_item else '1'
-                t = float(t_text) if t_text else 1  # Default t to 1 if not provided
+                # Получение TC
+                TC_item = self.tableWidget.item(row, 2)
+                if TC_item and TC_item.text():
+                    TC = float(TC_item.text())
+                else:
+                    TC = None
 
-                P_item = self.tableWidget.item(row, 3)
-                P_text = P_item.text() if P_item else ''
-                P = float(P_text) if P_text else None
+                # Получение t
+                t_item = self.tableWidget.item(row, 3)
+                if t_item and t_item.text():
+                    t = float(t_item.text())
+                else:
+                    t = 1.00  # Значение по умолчанию - 1
 
-                # Validate input
-                if Q is not None and Q <= 0 and (P is not None and P > 0):
-                    QMessageBox.warning(self, "Ошибка", "Некорректный ввод: Q не может быть меньше или равно нулю, если P больше нуля.")
-                    return
+                # Получение P
+                P_item = self.tableWidget.item(row, 4)
+                if P_item and P_item.text():
+                    P = float(P_item.text())
+                else:
+                    P = None
 
-                if TC is not None and TC < 0:
-                    QMessageBox.warning(self, "Ошибка", "Некорректный ввод: TC не может быть отрицательным.")
-                    return
+                # Получение P2
+                P2_item = self.tableWidget.item(row, 5)
+                if P2_item and P2_item.text():
+                    P2 = float(P2_item.text())
+                else:
+                    P2 = None
 
-                # Calculate missing value
-                if Q is not None and TC is not None and t > 0:  # Q, TC, t are known, calculate P
+                # Вычисление недостающего значения для Q, TC, P, t
+                if Q is not None and TC is not None and t > 0:
                     P = Q / (TC * t)
-                    P_item = QtWidgets.QTableWidgetItem(f"{P:.2f}")
-                    self.tableWidget.setItem(row, 3, P_item)
-                elif Q is not None and TC is not None and P is not None:  # Q, TC, P are known, calculate t
+                    P_item = QTableWidgetItem(f"{P:.2f}")
+                    self.tableWidget.setItem(row, 4, P_item)
+                elif Q is not None and TC is not None and P is not None:
                     t = TC / (Q / P)
-                    t_item = QtWidgets.QTableWidgetItem(f"{t:.2f}")
-                    self.tableWidget.setItem(row, 2, t_item)
-                elif Q is not None and P is not None and t > 0:  # Q, P, t are known, calculate TC
+                    t_item = QTableWidgetItem(f"{t:.2f}")
+                    self.tableWidget.setItem(row, 3, t_item)
+                elif Q is not None and P is not None and t > 0:
                     TC = Q / P * t
-                    TC_item = QtWidgets.QTableWidgetItem(f"{TC:.2f}")
-                    self.tableWidget.setItem(row, 1, TC_item)
-                elif TC is not None and P is not None and t > 0:  # TC, P, t are known, calculate Q
+                    TC_item = QTableWidgetItem(f"{TC:.2f}")
+                    self.tableWidget.setItem(row, 2, TC_item)
+                elif TC is not None and P is not None and t > 0:
                     Q = TC * P / t
-                    Q_item = QtWidgets.QTableWidgetItem(f"{Q:.2f}")
+                    Q_item = QTableWidgetItem(f"{Q:.2f}")
                     self.tableWidget.setItem(row, 0, Q_item)
 
-            self.calculate_absolute_advantage()
+                # Вычисление недостающего значения для Q2, P2, TC, t
+                if Q2 is not None and TC is not None and t > 0:
+                    P2 = Q2 / (TC * t)
+                    P2_item = QTableWidgetItem(f"{P2:.2f}")
+                    self.tableWidget.setItem(row, 5, P2_item)
+                elif Q2 is not None and TC is not None and P2 is not None:
+                    t = TC / (Q2 / P2)
+                    t_item = QTableWidgetItem(f"{t:.2f}")
+                    self.tableWidget.setItem(row, 3, t_item)
+                elif Q2 is not None and P2 is not None and t > 0:
+                    TC = Q2 / P2 * t
+                    TC_item = QTableWidgetItem(f"{TC:.2f}")
+                    self.tableWidget.setItem(row, 2, TC_item)
+                elif TC is not None and P2 is not None and t > 0:
+                    Q2 = TC * P2 / t
+                    Q2_item = QTableWidgetItem(f"{Q2:.2f}")
+                    self.tableWidget.setItem(row, 1, Q2_item)
+
+            self.update_advantages_result()
 
         except ValueError:
             QMessageBox.warning(self, "Ошибка", "Некорректный ввод: Пожалуйста, проверьте введенные значения.")
@@ -230,24 +276,66 @@ class Ui_productivity_and_advantages(QWidget):
         max_productivity = -1
         producer_name = ""
         for row in range(self.tableWidget.rowCount()):
-            P_item = self.tableWidget.item(row, 3)
-            P_text = P_item.text() if P_item else '0'
-            P = float(P_text) if P_text else 0
+            P_item = self.tableWidget.item(row, 4)
+            if P_item and P_item.text():
+                P = float(P_item.text())
+            else:
+                P = 0
             if P > max_productivity:
                 max_productivity = P
                 header_item = self.tableWidget.verticalHeaderItem(row)
-                producer_name = header_item.text() if header_item else ""
-        self.absolute_advantage_label.setText(f"Абсолютное преимущество имеет: {producer_name}")
+                if header_item:
+                    producer_name = header_item.text()
+                else:
+                    producer_name = ""
+        self.producer_name = producer_name
+
+    def calculate_relative_advantage(self):
+        min_opportunity_cost = float('inf')  # Минимальная альтернативная стоимость
+        relative_advantage_producer = ""
+
+        for row in range(self.tableWidget.rowCount()):
+            Q_item = self.tableWidget.item(row, 0)
+            Q2_item = self.tableWidget.item(row, 1)
+
+            # Проверяем, что оба значения Q и Q2 заданы
+            if Q_item and Q_item.text() and Q2_item and Q2_item.text():
+                try:
+                    Q = float(Q_item.text())
+                    Q2 = float(Q2_item.text())
+
+                    if Q2 > 0:  # Избегаем деления на 0
+                        opportunity_cost = Q / Q2
+                        if opportunity_cost < min_opportunity_cost:
+                            min_opportunity_cost = opportunity_cost
+                            header_item = self.tableWidget.verticalHeaderItem(row)
+                            relative_advantage_producer = header_item.text() if header_item else ""
+                except ValueError:
+                    QMessageBox.warning(self, "Ошибка", "Некорректный ввод: Пожалуйста, проверьте значения Q и Q2.")
+                    return
+
+        # Обновляем метку с результатом
+        if relative_advantage_producer:
+            self.relative_advantage = relative_advantage_producer
+        else:
+            self.relative_advantage = "Относительное преимущество определить не удалось."
+
+    def update_advantages_result(self):
+        self.calculate_absolute_advantage()
+        self.calculate_relative_advantage()
+        self.absolute_advantage_label.setText(
+            f"Абсолютное преимущество имеет: {self.producer_name}\n"
+            f"Относительное преимущество имеет: {self.relative_advantage}"
+        )
 
 
 class ElasticityCalculator(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Эластичность калькулятор")
-        self.setFixedSize(600, 800)  # фиксированный размер окна
         self.initUI()
         self.setGeometry(100, 100, 600, 800)
-        self.setFixedSize(600, 800)
+
 
     def initUI(self):
         main_layout = QVBoxLayout()
@@ -344,44 +432,40 @@ class ElasticityCalculator(QWidget):
         qy_initial = self.cross_initial_quantity_y.value()
         qy_final = self.cross_final_quantity_y.value()
 
-        try:
-            # Расчет эластичности замещения ресурсов
-            if L != 0 and Pr != 0:
-                capital_labor_ratio = K / L
-                price_ratio = P1 / Pr
-                elasticity_substitution = round((capital_labor_ratio / price_ratio), 3)
-            else:
-                elasticity_substitution = "Ошибка: L и Pr должны быть больше 0"
+        # Расчет эластичности замещения ресурсов
+        if L != 0 and Pr != 0:
+            capital_labor_ratio = K / L
+            price_ratio = P1 / Pr
+            elasticity_substitution = round((capital_labor_ratio / price_ratio), 3)
+        else:
+            elasticity_substitution = "Ошибка: L и Pr должны быть больше 0"
 
-            # Расчет эластичности спроса по цене
-            if q_initial + q_final != 0 and p_initial + p_final != 0:
-                elasticity_price = round((((q_final - q_initial) / (q_initial + q_final)) / (
-                    (p_final - p_initial) / (p_initial + p_final))), 3)
-            else:
-                elasticity_price = "Ошибка: сумма начального и конечного значения\nцены или количества не должна быть равна 0"
+        # Расчет эластичности спроса по цене
+        if q_initial + q_final != 0 and p_initial + p_final != 0:
+            elasticity_price = round((((q_final - q_initial) / (q_initial + q_final)) / (
+                (p_final - p_initial) / (p_initial + p_final))), 3)
+        else:
+            elasticity_price = "Ошибка: сумма начального и конечного значения\nцены или количества не должна быть равна 0"
 
-            # Расчет перекрестной эластичности спроса
-            if qy_initial != 0 and px_initial != 0:
-                delta_qy = qy_final - qy_initial
-                delta_px = px_final - px_initial
-                elasticity_cross = round(((delta_qy / qy_initial) / (delta_px / px_initial)), 3)
-            else:
-                elasticity_cross = "Ошибка: начальные значения\nспроса или цены не должны быть равны 0"
+        # Расчет перекрестной эластичности спроса
+        if qy_initial != 0 and px_initial != 0:
+            delta_qy = qy_final - qy_initial
+            delta_px = px_final - px_initial
+            elasticity_cross = round(((delta_qy / qy_initial) / (delta_px / px_initial)), 3)
+        else:
+            elasticity_cross = "Ошибка: начальные значения\nспроса или цены не должны быть равны 0"
 
-            # Выводим результаты в лейбл
-            self.result_label.setText(
-                f"Эластичность замещения: {elasticity_substitution}\n"
-                "\n"
-                f"Эластичность спроса по цене: {elasticity_price}\n"
-                "\n"
-                f"Перекрестная эластичность: {elasticity_cross}"
-            )
-
-        except ZeroDivisionError:
-            self.result_label.setText("Ошибка: деление на ноль. Проверьте входные данные.")
+        # Выводим результаты в лейбл
+        self.result_label.setText(
+            f"Эластичность замещения: {elasticity_substitution}\n"
+            "\n"
+            f"Эластичность спроса по цене: {elasticity_price}\n"
+            "\n"
+            f"Перекрестная эластичность: {elasticity_cross}"
+        )
 
 
-#class smotri str122(QWidget):
+# class smotri str122(QWidget):
 
 
 if __name__ == "__main__":
