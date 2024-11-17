@@ -38,7 +38,7 @@ class EconomicCurves(QMainWindow):
         self.stacked_widget = QStackedWidget()
         self.layout.addWidget(self.stacked_widget)
 
-        # Страница спроса
+        # Страница спроса и предложения
         self.demandSupply_page = QWidget()
         self.demandSupply_layout = QVBoxLayout(self.demandSupply_page)
         self.demandSupply_price_input = QLineEdit()
@@ -111,10 +111,10 @@ class EconomicCurves(QMainWindow):
         if price is not None and quantity is not None:
             self.demandSupply_plot_widget.clear()
 
-            # Кривая спроса (обычно убывающая)
+            # Кривая спроса
             self.demandSupply_plot_widget.plot([0, quantity], [price, 0], pen='r', name="Кривая спроса")
 
-            # Кривая предложения (обычно возрастающая)
+            # Кривая предложения
             self.demandSupply_plot_widget.plot([0, quantity], [0, price], pen='g', name="Кривая предложения")
 
 
@@ -134,48 +134,70 @@ class Ui_productivity_and_advantages(QWidget):
         self.remove_button.clicked.connect(self.remove_producer_dialog)
         self.gridLayout.addWidget(self.remove_button, 3, 0, 1, 1)
 
-        # Process button
+        self.save_button = QPushButton("Сохранить данные", self)
+        self.save_button.clicked.connect(self.save_result)
+        self.gridLayout.addWidget(self.save_button, 6, 0, 1, 1)
+
+        # Кнопка обработки
         self.process_button = QPushButton("Обработать", self)
         self.process_button.clicked.connect(self.process_data)
-        self.gridLayout.addWidget(self.process_button, 4, 0, 1, 1)  # Place it below other buttons
+        self.gridLayout.addWidget(self.process_button, 4, 0, 1, 1)
 
         self.tableWidget = QTableWidget(self)
-        self.tableWidget.setColumnCount(6)  # Only Q, TC, t, and P columns
+        self.tableWidget.setColumnCount(6)
         self.tableWidget.setRowCount(2)
         self.tableWidget.setHorizontalHeaderLabels(["Q", "Q2", "TC", "t", "P", "P2"])
         self.tableWidget.setVerticalHeaderLabels(["Производитель 1", "Производитель 2"])
         self.gridLayout.addWidget(self.tableWidget, 0, 0, 1, 1)
 
+        # Устанавливаем подсказки для каждого столбца
+        self.set_column_tooltips()
+
         self.producer_name = ''
         self.relative_advantage = ''
 
         for row in range(self.tableWidget.rowCount()):
-            default_t_item = QTableWidgetItem("1.00")  # Default value for 't'
+            default_t_item = QTableWidgetItem("1.00")  # значение по умолчанию  для 't'
             self.tableWidget.setItem(row, 3, default_t_item)
 
         self.absolute_advantage_label = QLabel(f"Абсолютное преимущество имеет: {self.producer_name}"
-                                               f" \nОтносительное преимщество имеет: {self.relative_advantage}", self)
+                                               f" \nОтносительное преимущество имеет: {self.relative_advantage}", self)
         self.gridLayout.addWidget(self.absolute_advantage_label, 5, 0, 1, 1)
 
-    def add_producer_dialog(self):
+    def set_column_tooltips(self):  # метод по созданию подсказок
+
+        tooltips = {
+            "Q": "Количество произведенного товара",
+            "Q2": "Количество второго товара, произведенного вместо первого",
+            "TC": "Общие затраты (Total Cost)",
+            "t": "Время на производство единицы товара",
+            "P": "Производительность (Q / (TC * t))",
+            "P2": "Производительность для второго товара (Q2 / (TC * t))",
+        }
+
+        for col_index, header_name in enumerate(tooltips.keys()):
+            header_item = self.tableWidget.horizontalHeaderItem(col_index)
+            header_item.setToolTip(tooltips[header_name])  # Устанавливаем подсказку для заголовка столбца
+
+    def add_producer_dialog(self):  # функция добавления производителя
         producer_name, ok = QInputDialog.getText(self, "Добавить производителя", "Введите название производителя:")
         if ok and producer_name:
             current_row_count = self.tableWidget.rowCount()
-            if current_row_count < 100:  # Example limit, can be adjusted
-                self.tableWidget.insertRow(current_row_count)  # Add a new row
-                default_t_item = QTableWidgetItem("1")  # Default t value
+            if current_row_count < 100:
+                self.tableWidget.insertRow(current_row_count)  # добавляем новую строку(запись)
+                default_t_item = QTableWidgetItem("1")
                 self.tableWidget.setItem(current_row_count, 3, default_t_item)
                 self.tableWidget.setVerticalHeaderItem(current_row_count, QTableWidgetItem(producer_name))
             else:
                 QMessageBox.warning(self, "Ошибка", "Достигнуто максимальное количество производителей.")
 
-    def remove_producer_dialog(self):
+    def remove_producer_dialog(self):  # функция удаления производителя
         producer_name, ok = QInputDialog.getText(self, "Удалить производителя",
                                                  "Введите название производителя для удаления:")
         if ok and producer_name:
             current_row = self.find_producer_row(producer_name)
             if current_row != -1:
-                self.tableWidget.removeRow(current_row)  # Remove the selected row
+                self.tableWidget.removeRow(current_row)  # Удаляем выбранную строку
             else:
                 QMessageBox.warning(self, "Ошибка", "Производитель не найден.")
 
@@ -272,7 +294,7 @@ class Ui_productivity_and_advantages(QWidget):
         except ValueError:
             QMessageBox.warning(self, "Ошибка", "Некорректный ввод: Пожалуйста, проверьте введенные значения.")
 
-    def calculate_absolute_advantage(self):
+    def calculate_absolute_advantage(self):  # функция определения абсолютного преимщуества (чьё P1 больше)
         max_productivity = -1
         producer_name = ""
         for row in range(self.tableWidget.rowCount()):
@@ -328,6 +350,50 @@ class Ui_productivity_and_advantages(QWidget):
             f"Относительное преимущество имеет: {self.relative_advantage}"
         )
 
+    def get_table_data(self, table_widget):
+        rows = table_widget.rowCount()
+        columns = table_widget.columnCount()
+        data = []
+
+        for row in range(rows):
+            row_data = []
+            for col in range(columns):
+                item = table_widget.item(row, col)
+                row_data.append(item.text() if item else "")  # Если ячейка пустая, записываем пустую строку
+            data.append(row_data)
+        return data
+
+    def save_result(self):
+        try:
+            # Подключаемся к SQLite базе данных
+            conn = sqlite3.connect('result.sqlite')  # Создаем файл
+            cursor = conn.cursor()
+
+            # Формируем SQL-запрос для создания таблицы
+            column_names = ["Q", "Q2", "TC", "t", "P", "P2"]
+            columns_definition = ", ".join([f"{col} TEXT" for col in column_names])
+            create_table_query = f"CREATE TABLE IF NOT EXISTS producers ({columns_definition})"
+            cursor.execute(create_table_query)
+
+            # Получаем данные из таблицы
+            data = self.get_table_data(self.tableWidget)
+
+            # Формируем строку с плейсхолдерами для значений
+            placeholders = ", ".join(["?"] * len(column_names))
+            insert_query = f"INSERT INTO producers VALUES ({placeholders})"
+
+            # Вставляем данные построчно
+            for row in data:
+                cursor.execute(insert_query, row)
+
+            conn.commit()  # Сохраняем изменения
+            conn.close()  # Закрываем соединение
+
+            # Сообщение об успешном сохранении
+            QMessageBox.information(self, "Успех", "Данные успешно сохранены в базу данных!")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Произошла ошибка при сохранении: {e}")
+
 
 class ElasticityCalculator(QWidget):
     def __init__(self):
@@ -335,7 +401,6 @@ class ElasticityCalculator(QWidget):
         self.setWindowTitle("Эластичность калькулятор")
         self.initUI()
         self.setGeometry(100, 100, 600, 800)
-
 
     def initUI(self):
         main_layout = QVBoxLayout()
@@ -445,7 +510,8 @@ class ElasticityCalculator(QWidget):
             elasticity_price = round((((q_final - q_initial) / (q_initial + q_final)) / (
                 (p_final - p_initial) / (p_initial + p_final))), 3)
         else:
-            elasticity_price = "Ошибка: сумма начального и конечного значения\nцены или количества не должна быть равна 0"
+            elasticity_price = ("Ошибка: сумма начального и конечного значения\n"
+                                "цены или количества не должна быть равна 0")
 
         # Расчет перекрестной эластичности спроса
         if qy_initial != 0 and px_initial != 0:
@@ -465,11 +531,11 @@ class ElasticityCalculator(QWidget):
         )
 
 
-# class smotri str122(QWidget):
-
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = EconomicCurves()
     window.show()
     sys.exit(app.exec())
+
+
+# created by Поджарых Сергей
